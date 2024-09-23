@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	crand "crypto/rand"
 	"fmt"
 	mrand "math/rand"
 	"net"
@@ -17,7 +15,7 @@ func Ssh(address net.IP, port int, delay int, jitter int, channel chan *Message)
         return err
     }
 
-    channel <- &Message{5, fmt.Sprintf("Opened new listener on %s", tcpAddress.String())}
+    channel <- &Message{5, fmt.Sprintf("Opened new SSH listener on %s", tcpAddress.String())}
 
     for {
         connection, err := listener.Accept()
@@ -27,34 +25,20 @@ func Ssh(address net.IP, port int, delay int, jitter int, channel chan *Message)
 
         go func() {
             remoteAddress := connection.RemoteAddr().String()
-            channel <- &Message{6, fmt.Sprintf("New connection from %s", remoteAddress)}
+            channel <- &Message{6, fmt.Sprintf("SSH: New connection from %s", remoteAddress)}
             start := time.Now().Unix()
-
             for {
-                tar := make([]byte, mrand.Intn(63))
-                _, err := crand.Read(tar)
+                // mrand.Intn can return 0, creating a zero-length byte slice
+                err, tar := MakeTar(mrand.Intn(64) + 1, true)
                 if err != nil {
                     break
                 }
-                tar = append(tar, 0x0A)
-
-                n, err := connection.Write(bytes.ToValidUTF8(tar, []byte("")))
+                err = Handle(connection, channel, tar, start, delay, jitter)
                 if err != nil {
                     break
-                }
-
-                stuck := time.Now().Unix() - start
-                channel <- &Message{7, fmt.Sprintf("Wrote %d bytes to %s (stuck for %d seconds)", n, remoteAddress, stuck)}
-
-                if mrand.Intn(1) == 1 {
-                    time.Sleep(time.Duration(delay + mrand.Intn(jitter)) * time.Second)
-                } else {
-                    time.Sleep(time.Duration(delay - mrand.Intn(jitter)) * time.Second)
                 }
             }
-
             channel <- &Message{6, fmt.Sprintf("Closed connection from %s", remoteAddress)}
-
         }()
     }
 }

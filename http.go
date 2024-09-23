@@ -30,7 +30,8 @@ func Http(address net.IP, port int, delay int, jitter int, channel chan *Message
             channel <- &Message{6, fmt.Sprintf("HTTP: New connection from %s", remoteAddress)}
             start := time.Now().Unix()
             for {
-                err, tar := MakeTar(mrand.Intn(128), true)
+                // mrand.Intn can return 0, creating a zero-length byte slice
+                err, tar := MakeTar(mrand.Intn(127) + 1, true)
                 if err != nil {
                     break
                 }
