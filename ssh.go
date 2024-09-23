@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bytes"
+	crand "crypto/rand"
 	"fmt"
 	mrand "math/rand"
-    crand "crypto/rand"
 	"net"
-    "time"
+	"time"
 )
 
 func Ssh(address net.IP, port int, delay int, jitter int, channel chan *Message) (error error) {
@@ -30,10 +31,14 @@ func Ssh(address net.IP, port int, delay int, jitter int, channel chan *Message)
             start := time.Now().Unix()
 
             for {
-                tar := make([]byte, mrand.Intn(64))
-                crand.Read(tar)
+                tar := make([]byte, mrand.Intn(63))
+                _, err := crand.Read(tar)
+                if err != nil {
+                    break
+                }
+                tar = append(tar, 0x0A)
 
-                n, err := connection.Write(tar)
+                n, err := connection.Write(bytes.ToValidUTF8(tar, []byte("")))
                 if err != nil {
                     break
                 }
@@ -42,9 +47,9 @@ func Ssh(address net.IP, port int, delay int, jitter int, channel chan *Message)
                 channel <- &Message{7, fmt.Sprintf("Wrote %d bytes to %s (stuck for %d seconds)", n, remoteAddress, stuck)}
 
                 if mrand.Intn(1) == 1 {
-                    time.Sleep(time.Duration(delay + jitter) * time.Second)
+                    time.Sleep(time.Duration(delay + mrand.Intn(jitter)) * time.Second)
                 } else {
-                    time.Sleep(time.Duration(delay - jitter) * time.Second)
+                    time.Sleep(time.Duration(delay - mrand.Intn(jitter)) * time.Second)
                 }
             }
 
